@@ -66,7 +66,7 @@ constructor(gl, volume, environmentTexture, options) {
         }
     });
 
-    this._programs = WebGL.buildPrograms(gl, SHADERS.renderers.MCM, MIXINS);
+    this._programs = WebGL.buildPrograms(gl, SHADERS.renderers.Spectral, MIXINS);
 }
 
 destroy() {
