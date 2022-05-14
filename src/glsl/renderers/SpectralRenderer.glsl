@@ -196,7 +196,13 @@ in vec2 vPosition;
 out vec4 oColor;
 
 void main() {
-    oColor = vec4(texture(uColor, vPosition).rgb, 1);
+    // Compute the XYZ color representation from spectrum at pixel
+    // position [vPosition].
+    // TODO: Compute the XYZ color from spectrum.
+    vec3 xyz = texture(uColor, vPosition).rgb;
+
+    // Convert from XYZ to RGBA color.
+    oColor = vec4(xyz2rgb(xyz), 1);
 }
 
 // #part /glsl/shaders/renderers/Spectral/reset/vertex

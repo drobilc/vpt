@@ -33,3 +33,21 @@ float Z(float x) {
     float v2 = dx2 * S(dx2, 0.0385, 0.0725);
     return 1.217 * exp(0.5 * v1 * v1) + 0.681 * exp(0.5 * v2 * v2);
 }
+
+vec3 xyzResponseAt(float x) {
+    return vec3(X(x), Y(x), Z(x));
+}
+
+vec3 averageXYZResponseInBin(float fromLambda, float toLambda, uint numberOfSamples) {
+    vec3 result = vec3(0, 0, 0);
+
+    float interval = toLambda - fromLambda;
+    float sectionWidth = interval / float(numberOfSamples);
+
+    for (uint i = 0u; i < numberOfSamples; i++) {
+        float lambda = fromLambda + float(i) * sectionWidth;
+        result += xyzResponseAt(lambda);
+    }
+
+    return result / float(numberOfSamples);
+}
