@@ -184,6 +184,12 @@ void main() {
 #version 300 es
 precision mediump float;
 
+// #link /glsl/mixins/XYZITU2002
+@XYZITU2002
+
+// #link /glsl/mixins/XYZColorMatching
+@XYZColorMatching
+
 uniform mediump sampler2D uColor;
 
 in vec2 vPosition;
