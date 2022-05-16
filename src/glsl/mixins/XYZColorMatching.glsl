@@ -55,3 +55,37 @@ vec3 averageXYZResponseInBin(float fromLambda, float toLambda, uint subsamples) 
 
     return result / float(subsamples);
 }
+
+float sum3(vec3 v) {
+    return v.x + v.y + v.z;
+}
+
+vec3 spectrumToXYZ(float spectrum[numberOfSamples]) {
+
+    vec3 XYZ[numberOfSamples];
+
+    // Compute X(lambda), Y(lambda) and Z(lambda) response curves.
+    // TODO: This should only be computed ONCE and not once per each pixel.
+    float interval = endWavelength - startWavelength;
+    float bucketSize = interval / float(numberOfSamples);
+    for (uint i = 0u; i < numberOfSamples; i++) {
+        float wavelength = startWavelength + float(i) * bucketSize;
+        float nextWavelength = startWavelength + float(i + 1u) * bucketSize;
+        XYZ[i] = averageXYZResponseInBin(wavelength, nextWavelength, 8u);
+    }
+
+    // Compute the integral / riemann sum of the spectrum multiplied with each
+    // response curve.
+    vec3 xyzColor = vec3(0.0, 0.0, 0.0);
+    for (uint i = 0u; i < numberOfSamples; i++) {
+        xyzColor += spectrum[i] * XYZ[i];
+    }
+
+    // Correctly scale the computed XYZ color.
+    float scale = (endWavelength - startWavelength) / (float(numberOfSamples) * 106.856895);
+    vec3 color = scale * xyzColor;
+    
+    // Compute the xyz coefficients from XYZ values.
+    return color / sum3(color);
+
+}
