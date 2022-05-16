@@ -12,3 +12,4 @@ export * from './Tabs/Tabs.js';
 export * from './TransferFunction/TransferFunction.js';
 export * from './VectorSpinner/VectorSpinner.js';
 export * from './Spectrum/Spectrum.js';
+export * from './SpectralTransferFunction/SpectralTransferFunction.js';

@@ -49,8 +49,8 @@ constructor(gl, volume, environmentTexture, options) {
         },
         {
             name: 'transferFunction',
-            label: 'Transfer function',
-            type: 'transfer-function',
+            label: 'Spectral transfer function',
+            type: 'spectral-transfer-function',
             value: new Uint8Array(256),
         },
     ]);

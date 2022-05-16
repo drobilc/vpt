@@ -10,6 +10,10 @@ static construct(properties) {
             const accordion = `<ui-accordion><span slot="label">Transfer function</span>${widget}</ui-accordion>`;
             const instance = DOMUtils.instantiate(accordion);
             panel.appendChild(instance);
+        } else if (property.type === 'spectral-transfer-function') {
+            const accordion = `<ui-accordion><span slot="label">${property.label}</span>${widget}</ui-accordion>`;
+            const instance = DOMUtils.instantiate(accordion);
+            panel.appendChild(instance);
         } else if (property.type === 'spectrum') {
             const accordion = `<ui-accordion><span slot="label">${property.label}</span>${widget}</ui-accordion>`;
             const instance = DOMUtils.instantiate(accordion);
@@ -33,6 +37,7 @@ static constructProperty(property) {
         case 'color-chooser': return `<ui-color-chooser bind="${property.name}" value="${property.value}"></ui-color-chooser>`;
         case 'transfer-function': return `<ui-transfer-function bind="${property.name}"></ui-transfer-function>`;
         case 'spectrum': return `<ui-spectrum bind="${property.name}"></ui-spectrum>`;
+        case 'spectral-transfer-function': return `<ui-spectral-transfer-function bind="${property.name}"></spectral-transfer-function>`;
         default: return `<div></div>`;
     }
 }
