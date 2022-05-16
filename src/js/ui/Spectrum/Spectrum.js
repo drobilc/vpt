@@ -21,7 +21,7 @@ constructor() {
     this.canvas.width = 300;
     this.canvas.height = 100;
 
-    this.spectrum = new Float32Array(64);
+    this.spectrum = new Float32Array(32);
 
     let resetButton = this.binds.reset;
     this.resetButtonClickListener = this.resetButtonClickListener.bind(this);
