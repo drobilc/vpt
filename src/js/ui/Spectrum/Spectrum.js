@@ -36,6 +36,10 @@ constructor() {
     this.canvas.addEventListener('pointerdown', this.pointerdownListener);
 }
 
+get value() {
+    return this.spectrum;
+}
+
 _updateUI() {
     const ctx = this.context;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -65,6 +69,7 @@ _setValueByEvent(e) {
     let value = 1 - (y / this.canvas.height);
     this.spectrum[bandIndex] = value;
     this._updateUI();
+    this.dispatchEvent(new Event('change'));
 }
 
 pointerdownListener(e) {
@@ -90,6 +95,7 @@ resetButtonClickListener(e) {
         this.spectrum[i] = 0;
     }
     this._updateUI();
+    this.dispatchEvent(new Event('change'));
 }
 
 }

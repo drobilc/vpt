@@ -60,6 +60,8 @@ constructor(gl, volume, environmentTexture, options) {
 
         if (name === 'transferFunction') {
             this.setTransferFunction(this.transferFunction);
+        } else if (name === 'lightSpectrum') {
+            this.setLightSpectrum(value);
         }
 
         if ([
@@ -67,12 +69,39 @@ constructor(gl, volume, environmentTexture, options) {
             'anisotropy',
             'bounces',
             'transferFunction',
+            'lightSpectrum',
         ].includes(name)) {
             this.reset();
         }
     });
 
     this._programs = WebGL.buildPrograms(gl, SHADERS.renderers.Spectral, MIXINS);
+
+    this.lightSpectrumTexture = WebGL.createTexture(gl, {
+        width  : 1,
+        height : 1,
+        data: new Uint8Array([255, 0, 0, 255]),
+        type: gl.UNSIGNED_BYTE,
+        wrapS: gl.CLAMP_TO_EDGE,
+        wrapT: gl.CLAMP_TO_EDGE,
+        min: gl.NEAREST,
+        max: gl.NEAREST,
+    });
+}
+
+setLightSpectrum(data) {
+    this.spectrum = new Uint8Array(data.length * 4);
+    for (let i = 0; i < data.length; i++) {
+        let value = Math.floor(data[i] * 255);
+        this.spectrum[4*i+0] = value;
+        this.spectrum[4*i+1] = value;
+        this.spectrum[4*i+2] = value;
+        this.spectrum[4*i+3] = value;
+    }
+
+    const gl = this._gl;
+    gl.bindTexture(gl.TEXTURE_2D, this.lightSpectrumTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, data.length, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.spectrum);
 }
 
 destroy() {
@@ -80,7 +109,7 @@ destroy() {
     Object.keys(this._programs).forEach(programName => {
         gl.deleteProgram(this._programs[programName].program);
     });
-
+    gl.deleteTexture(this.lightSpectrumTexture);
     super.destroy();
 }
 
@@ -131,6 +160,9 @@ _integrateFrame() {
     gl.activeTexture(gl.TEXTURE6);
     gl.bindTexture(gl.TEXTURE_2D, this._transferFunction);
 
+    gl.activeTexture(gl.TEXTURE7);
+    gl.bindTexture(gl.TEXTURE_2D, this.lightSpectrumTexture);
+
     gl.uniform1i(uniforms.uPosition, 0);
     gl.uniform1i(uniforms.uDirection, 1);
     gl.uniform1i(uniforms.uTransmittance, 2);
@@ -139,6 +171,7 @@ _integrateFrame() {
     gl.uniform1i(uniforms.uVolume, 4);
     gl.uniform1i(uniforms.uEnvironment, 5);
     gl.uniform1i(uniforms.uTransferFunction, 6);
+    gl.uniform1i(uniforms.lightSpectrum, 7);
 
     const mvpit = this.calculateMVPInverseTranspose();
     gl.uniformMatrix4fv(uniforms.uMvpInverseMatrix, false, mvpit.m);

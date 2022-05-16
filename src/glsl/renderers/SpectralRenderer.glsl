@@ -39,6 +39,7 @@ uniform mediump sampler2D uRadiance;
 uniform mediump sampler3D uVolume;
 uniform mediump sampler2D uTransferFunction;
 uniform mediump sampler2D uEnvironment;
+uniform mediump sampler2D lightSpectrum;
 
 uniform mat4 uMvpInverseMatrix;
 uniform vec2 uInverseResolution;
@@ -171,15 +172,15 @@ float mean3(vec3 v) {
 
 void main() {
 
-    vec2 mappedPosition = vPosition * 0.5 + 0.5;
-    uint k = uint(mappedPosition.x * float(numberOfSamples));
-
-    // Compute spectrum with unit response at
-    // wavelength = k * ((endLamba - startLambda) / numberOfSamples)
     float spectrum[numberOfSamples];
     for (uint i = 0u; i < numberOfSamples; i++) {
-        spectrum[i] = i == k ? 1.0 : 0.0;
+        float position = float(i) / float(numberOfSamples);
+        vec2 texturePosition = vec2(position, 0.5);
+        float a = texture(lightSpectrum, texturePosition).r;
+        spectrum[i] = a / 255.0;
     }
+
+    vec2 mappedPosition = vPosition * 0.5 + 0.5;
     
     vec3 position = texture(uPosition, mappedPosition).xyz;
 
@@ -195,8 +196,8 @@ void main() {
     oPosition = vec4(position, 0);
     oDirection = vec4(direction, float(bounces));
     oTransmittance = vec4(transmittance, 0);
-    vec3 result = spectrumToXYZ(spectrum);
-    oRadiance = vec4(result, float(samples));
+    vec3 color = spectrumToXYZ(spectrum);
+    oRadiance = vec4(color, 1.0);
     
 }
 
