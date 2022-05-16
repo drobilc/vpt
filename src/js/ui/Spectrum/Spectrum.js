@@ -46,12 +46,30 @@ _updateUI() {
 
     ctx.fillStyle = "#2196f3";
     const bandWidth = this.canvas.width / this.spectrum.length;
-    for (let i = 0; i < this.spectrum.length; i++) {
-        let x = i * bandWidth;
-        let bandHeight = this.spectrum[i] * this.canvas.height;
-        let y = this.canvas.height - bandHeight;
-        ctx.fillRect(x, y, bandWidth + 1, bandHeight);
+
+    // First, draw line connecting all the spectrum points.
+    ctx.beginPath();
+    let firstX = 0.5 * bandWidth;
+    let firstY = this.canvas.height * (1 - this.spectrum[0]);
+    ctx.moveTo(firstX, firstY);;
+    for (let i = 1; i < this.spectrum.length; i++) {
+        let x = (i + 0.5) * bandWidth;
+        let y = this.canvas.height * (1 - this.spectrum[i]);
+        ctx.lineTo(x, y);
     }
+    ctx.stroke();
+    ctx.closePath();
+
+    // Then, draw circles of the spectrum.
+    for (let i = 0; i < this.spectrum.length; i++) {
+        let x = (i + 0.5) * bandWidth;
+        let y = this.canvas.height * (1 - this.spectrum[i]);
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, 2 * Math.PI, false);
+        ctx.closePath();
+        ctx.fill();
+    }
+
 }
 
 static observedAttributes = [];
@@ -62,11 +80,11 @@ attributeChangedCallback(name) {
 
 _setValueByEvent(e) {
     let rect = this.canvas.getBoundingClientRect();
-    let x = Math.min(this.canvas.width, Math.max(0, e.clientX - rect.left));
-    let y = Math.min(this.canvas.height, Math.max(0, e.clientY - rect.top));
+    let x = Math.min(rect.width, Math.max(0, e.clientX - rect.left));
+    let y = Math.min(rect.height, Math.max(0, e.clientY - rect.top));
 
-    let bandIndex = Math.round((x / this.canvas.width) * this.spectrum.length);
-    let value = 1 - (y / this.canvas.height);
+    let bandIndex = Math.round((x / rect.width) * this.spectrum.length);
+    let value = 1 - (y / rect.height);
     this.spectrum[bandIndex] = value;
     this._updateUI();
     this.dispatchEvent(new Event('change'));
