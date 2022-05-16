@@ -28,6 +28,8 @@ precision mediump float;
 @unprojectRand
 // #link /glsl/mixins/intersectCube
 @intersectCube
+// #link /glsl/mixins/XYZColorMatching
+@XYZColorMatching
 
 uniform mediump sampler2D uPosition;
 uniform mediump sampler2D uDirection;
@@ -108,7 +110,7 @@ float mean3(vec3 v) {
     return dot(v, vec3(1.0 / 3.0));
 }
 
-void main() {
+/*void main() {
     Photon photon;
     vec2 mappedPosition = vPosition * 0.5 + 0.5;
     photon.position = texture(uPosition, mappedPosition).xyz;
@@ -165,6 +167,37 @@ void main() {
     oDirection = vec4(photon.direction, float(photon.bounces));
     oTransmittance = vec4(photon.transmittance, 0);
     oRadiance = vec4(photon.radiance, float(photon.samples));
+}*/
+
+void main() {
+
+    vec2 mappedPosition = vPosition * 0.5 + 0.5;
+    uint k = uint(mappedPosition.x * float(numberOfSamples));
+
+    // Compute spectrum with unit response at
+    // wavelength = k * ((endLamba - startLambda) / numberOfSamples)
+    float spectrum[numberOfSamples];
+    for (uint i = 0u; i < numberOfSamples; i++) {
+        spectrum[i] = i == k ? 1.0 : 0.0;
+    }
+    
+    vec3 position = texture(uPosition, mappedPosition).xyz;
+
+    vec4 directionAndBounces = texture(uDirection, mappedPosition);
+    vec3 direction = directionAndBounces.xyz;
+    uint bounces = uint(directionAndBounces.w + 0.5);
+
+    vec3 transmittance = texture(uTransmittance, mappedPosition).rgb;
+    vec4 radianceAndSamples = texture(uRadiance, mappedPosition);
+    vec3 radiance = radianceAndSamples.rgb;
+    uint samples = uint(radianceAndSamples.w + 0.5);
+
+    oPosition = vec4(position, 0);
+    oDirection = vec4(direction, float(bounces));
+    oTransmittance = vec4(transmittance, 0);
+    vec3 result = spectrumToXYZ(spectrum);
+    oRadiance = vec4(result, float(samples));
+    
 }
 
 // #part /glsl/shaders/renderers/Spectral/render/vertex
@@ -198,7 +231,6 @@ out vec4 oColor;
 void main() {
     // Compute the XYZ color representation from spectrum at pixel
     // position [vPosition].
-    // TODO: Compute the XYZ color from spectrum.
     vec3 xyz = texture(uColor, vPosition).rgb;
 
     // Convert from XYZ to RGBA color.
