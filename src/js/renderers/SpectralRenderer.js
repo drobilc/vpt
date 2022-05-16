@@ -42,6 +42,12 @@ constructor(gl, volume, environmentTexture, options) {
             min: 0,
         },
         {
+            name: 'lightSpectrum',
+            label: 'Light spectrum',
+            type: 'spectrum',
+            value: new Float32Array(32),
+        },
+        {
             name: 'transferFunction',
             label: 'Transfer function',
             type: 'transfer-function',

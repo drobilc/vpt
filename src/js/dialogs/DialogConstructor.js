@@ -10,6 +10,10 @@ static construct(properties) {
             const accordion = `<ui-accordion><span slot="label">Transfer function</span>${widget}</ui-accordion>`;
             const instance = DOMUtils.instantiate(accordion);
             panel.appendChild(instance);
+        } else if (property.type === 'spectrum') {
+            const accordion = `<ui-accordion><span slot="label">${property.label}</span>${widget}</ui-accordion>`;
+            const instance = DOMUtils.instantiate(accordion);
+            panel.appendChild(instance);
         } else {
             const field = `<ui-field><label slot="label">${property.label}</label>${widget}</ui-field>`;
             const instance = DOMUtils.instantiate(field);
@@ -28,6 +32,7 @@ static constructProperty(property) {
         case 'checkbox': return `<ui-checkbox bind="${property.name}" checked="${property.value}"></ui-checkbox>`;
         case 'color-chooser': return `<ui-color-chooser bind="${property.name}" value="${property.value}"></ui-color-chooser>`;
         case 'transfer-function': return `<ui-transfer-function bind="${property.name}"></ui-transfer-function>`;
+        case 'spectrum': return `<ui-spectrum bind="${property.name}"></ui-spectrum>`;
         default: return `<div></div>`;
     }
 }
