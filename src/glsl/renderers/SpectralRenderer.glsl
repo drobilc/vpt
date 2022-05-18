@@ -200,7 +200,15 @@ void main() {
     oRadiance = vec4(color, 1.0);*/
 
     vec2 mappedPosition = vPosition * 0.5 + 0.5;
-    
+
+    float spectrum[numberOfSamples];
+    for (uint i = 0u; i < numberOfSamples; i++) {
+        float position = float(i) / float(numberOfSamples);
+        vec2 texturePosition = vec2(mappedPosition.x, position);
+        float a = texture(uTransferFunction, texturePosition).r;
+        spectrum[i] = a / 255.0;
+    }
+
     vec3 position = texture(uPosition, mappedPosition).xyz;
 
     vec4 directionAndBounces = texture(uDirection, mappedPosition);
@@ -215,8 +223,10 @@ void main() {
     oPosition = vec4(position, 0);
     oDirection = vec4(direction, float(bounces));
     oTransmittance = vec4(transmittance, 0);
-    vec4 color = texture(uTransferFunction, mappedPosition);
-    oRadiance = color;
+    /*vec4 color = texture(uTransferFunction, mappedPosition);
+    oRadiance = color;*/
+    vec3 color = spectrumToXYZ(spectrum);
+    oRadiance = vec4(color, 1.0);
 
     
 }
