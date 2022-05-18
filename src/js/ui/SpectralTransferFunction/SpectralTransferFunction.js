@@ -15,12 +15,35 @@ const [ templateElement, templateBump ] = await Promise.all([
 const template = document.createElement('template');
 template.innerHTML = templateElement;
 
+class Selection {
+
+    constructor(start, end) {
+        this.start = start;
+        this.end = end;
+    }
+
+    setSpectrum(spectrum) {
+        this.spectrum = spectrum;
+    }
+
+    contains(x) {
+        return x >= this.start && x <= this.end;
+    }
+
+    overlaps(start, end) {
+        return (this.start <= start) ? start <= this.end : this.start <= end;
+    }
+
+    width() {
+        return this.end - this.start;
+    }
+
+}
+
 export class SpectralTransferFunction extends HTMLElement {
 
 constructor() {
     super();
-
-    this.changeListener = this.changeListener.bind(this);
 
     this.shadow = this.attachShadow({ mode: 'open' });
     this.shadow.appendChild(template.content.cloneNode(true));
@@ -66,8 +89,11 @@ constructor() {
     gl.enableVertexAttribArray(program.attributes.aPosition);
     gl.vertexAttribPointer(program.attributes.aPosition, 2, gl.FLOAT, false, 0, 0);
 
-    this.bumps = [];
+    // A list of currently active selections.
+    this.selections = [];
 
+    this.overlayCanvas.addEventListener('mousedown', this.mouseDownListener.bind(this));
+    this.overlayCanvas.addEventListener('mouseup', this.mouseUpListener.bind(this));
     this.overlayCanvas.addEventListener('mousemove', this.mouseMoveListener.bind(this));
 
     // this.binds.spectrum.addEventListener('change', this.changeListener);
@@ -77,43 +103,146 @@ constructor() {
     });
 
     this.binds.cancelButton.addEventListener('click', function() {
-        this.selectionStart = null;
-        this.selectionEnd = null;
-        this.selection = null;
+        this.resetSelection();
         this.render();
     }.bind(this));
 
+    this.binds.clearButton.addEventListener('click', function() {
+        this.resetSelection();
+        this.selections = [];
+        this.render();
+    }.bind(this));
+
+    // Whether the user has clicked on the overlay canvas in some empty space.
+    // In this case, a new selection will be created.
+    this.isMakingNewSelection = false;
+
+    // Whether the user has clicked on existing selection in overlay canvas. In
+    // this case, the existing selection can be moved.
+    this.isMovingExistingSelection = false;
+
+    // The start and end x coordinate of the current selection. Used when
+    // creating a new selection.
     this.selectionStart = null;
     this.selectionEnd = null;
-    this.selection = null;
+
+    this.currentSelection = null;
 }
 
-setSelection(start, end) {
-    this.selection = { start: start, end: end };
+resetSelection() {
+    this.selectionStart = null;
+    this.selectionEnd = null;
+    this.currentSelection = null;
+    this.isMakingNewSelection = false;
+    this.isMovingExistingSelection = false;
+}
+
+findSelection(x) {
+    for (let i = 0; i < this.selections.length; i++) {
+        if (this.selections[i].contains(x)) {
+            return this.selections[i];
+        }
+    }
+    return null;
+}
+
+closestRight(x) {
+    let minDistance = Infinity;
+    let closest = null;
+    for (let i = 0; i < this.selections.length; i++) {
+        let distance = this.selections[i].start - x;
+        if (distance >= 0 && distance < minDistance) {
+            minDistance = distance;
+            closest = this.selections[i];
+        }
+    }
+    return closest;
+}
+
+intersectsWithAny(start, end) {
+    for (let i = 0; i < this.selections.length; i++) {
+        if (this.selections[i] == this.currentSelection) continue;
+        if (this.selections[i].overlaps(start, end))
+            return this.selections[i];
+    }
+    return null;
+}
+
+getLocalCoordinates(event) {
+    // Compute the mouse coordinates inside the canvas.
+    let rectangle = this.overlayCanvas.getBoundingClientRect();
+    let x = Math.min(rectangle.width, Math.max(0, event.clientX - rectangle.left));
+    let y = Math.min(rectangle.height, Math.max(0, event.clientY - rectangle.top));
+    return { x: x, y: y };
+}
+
+mouseDownListener(event) {
+    let mousePosition = this.getLocalCoordinates(event);
+
+    let clickedSelection = this.findSelection(mousePosition.x);
+    if (clickedSelection) {
+        // The user has tapped on already existing selection. Allow them to move
+        // it.
+        this.isMovingExistingSelection = true;
+        this.currentSelection = clickedSelection;
+        
+        // Reuse [this.selectionStart] variable to hold the mouse offset inside
+        // the selection.
+        this.selectionStart = mousePosition.x - this.currentSelection.start;
+    } else {
+         // The user has tapped on empty space, start adding a new selection.
+        this.isMakingNewSelection = true;
+        this.selectionStart = mousePosition.x;
+        this.selectionEnd = mousePosition.x;
+    }
+
+    this.render();
+    
+}
+
+mouseUpListener(event) {
+
+    // If the user was making a new selection and they have released the mouse,
+    // add a new selection to a list of selections and set it as currently
+    // selected, so that the spectrum can be changed.
+    if (this.isMakingNewSelection) {
+        if ((this.selectionEnd - this.selectionStart) <= 0.1) return;
+        let selection = new Selection(this.selectionStart, this.selectionEnd);
+        this.selections.push(selection);
+        this.currentSelection = selection;
+        this.isMakingNewSelection = false;
+        this.selectionStart = null;
+        this.selectionEnd = null;
+    } else if (this.isMovingExistingSelection) {
+        this.isMovingExistingSelection = false;
+        this.selectionStart = null;
+    }
+
+    this.render();
 }
 
 mouseMoveListener(event) {
-    let isButtonPressed = event.buttons & 1 === 1;
+    let mousePosition = this.getLocalCoordinates(event);
 
-    if (!isButtonPressed) {
-        if (this.selectionStart != null && this.selectionEnd != null)
-            this.setSelection(this.selectionStart, this.selectionEnd);
-        this.selectionStart = null;
-        this.selectionEnd = null;
-        this.render();
-        return;
-    }
-
-    let rectangle = this.overlayCanvas.getBoundingClientRect();
-    let x = Math.min(rectangle.width, Math.max(0, event.clientX - rectangle.left));
-    // let y = Math.min(rectangle.height, Math.max(0, event.clientY - rectangle.top));
-
-    if (this.selectionStart == null) {
-        this.selectionStart = x;
-        this.selectionEnd = x;
-    } else {
-        this.selectionStart = Math.min(this.selectionStart, x);
-        this.selectionEnd = Math.max(this.selectionEnd, x);
+    if (this.isMakingNewSelection) {
+        let newSelectionEnd = Math.max(mousePosition.x, this.selectionStart);
+        
+        // Make sure the selections don't overlap.
+        let nextSelection = this.closestRight(this.selectionStart);
+        if (nextSelection) {
+            newSelectionEnd = Math.min(nextSelection.start, newSelectionEnd);
+        }
+        
+        this.selectionEnd = newSelectionEnd;
+    } else if (this.isMovingExistingSelection) {
+        let width = this.currentSelection.width();
+        let newStart = mousePosition.x - this.selectionStart;
+        // Move the selection only if it doesn't intersect any other selection.
+        let intersects = this.intersectsWithAny(newStart, newStart + width);
+        if (intersects === null) {
+            this.currentSelection.start = newStart;
+            this.currentSelection.end = newStart + width;
+        }
     }
 
     this.render();
@@ -145,16 +274,24 @@ renderOverlay() {
     const ctx = this.overlayContext;
     ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
 
+    // Render all existing selections.
+    for (let i = 0; i < this.selections.length; i++) {
+        let selection = this.selections[i];
+        // Don't draw current selection.
+        if (selection === this.currentSelection) continue;
+        ctx.fillStyle = "rgba(150, 150, 150, 0.75)";
+        ctx.fillRect(selection.start, 0, selection.width(), this.overlayCanvas.height);
+    }
+
     if (this.selectionStart != null && this.selectionEnd != null) {
         ctx.fillStyle = "rgba(33, 150, 243, 0.25)";
         let width = this.selectionEnd - this.selectionStart;
         ctx.fillRect(this.selectionStart, 0, width, this.overlayCanvas.height);
     }
 
-    if (this.selection != null) {
+    if (this.currentSelection != null) {
         ctx.fillStyle = "rgba(33, 150, 243, 0.5)";
-        let width = this.selection.end - this.selection.start;
-        ctx.fillRect(this.selection.start, 0, width, this.overlayCanvas.height);
+        ctx.fillRect(this.currentSelection.start, 0, this.currentSelection.width(), this.overlayCanvas.height);
     }
 }
 
@@ -163,94 +300,17 @@ render() {
     const { uniforms } = this._program;
 
     gl.clear(gl.COLOR_BUFFER_BIT);
-    for (const bump of this.bumps) {
+    /*for (const bump of this.bumps) {
         gl.uniform2f(uniforms.uPosition, bump.position.x, bump.position.y);
         gl.uniform2f(uniforms.uSize, bump.size.x, bump.size.y);
         gl.uniform4f(uniforms.uColor, bump.color.r, bump.color.g, bump.color.b, bump.color.a);
         gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
-    }
+    }*/
     this.renderOverlay();
 }
 
 get value() {
     return this.canvas;
-}
-
-_addHandle(index) {
-    const handle = DOMUtils.instantiate(templateBump);
-    this.shadow.querySelector('.widget').appendChild(handle);
-    handle.dataset.index = index;
-
-    const left = this.bumps[index].position.x * this.width;
-    const top = (1 - this.bumps[index].position.y) * this.height;
-    handle.style.left = Math.round(left) + 'px';
-    handle.style.top = Math.round(top) + 'px';
-
-    new Draggable(handle, handle.querySelector('.bump-handle'));
-    handle.addEventListener('draggable', e => {
-        const x = e.currentTarget.offsetLeft / this.width;
-        const y = 1 - (e.currentTarget.offsetTop / this.height);
-        const i = parseInt(e.currentTarget.dataset.index);
-        this.bumps[i].position.x = x;
-        this.bumps[i].position.y = y;
-        this.render();
-        this.dispatchEvent(new Event('change'));
-    });
-    handle.addEventListener('pointerdown', e => {
-        const i = parseInt(e.currentTarget.dataset.index);
-        this.selectBump(i);
-    });
-    handle.addEventListener('wheel', e => {
-        const amount = e.deltaY * this.scaleSpeed;
-        const scale = Math.exp(-amount);
-        const i = parseInt(e.currentTarget.dataset.index);
-        this.selectBump(i);
-        if (e.shiftKey) {
-            this.bumps[i].size.y *= scale;
-        } else {
-            this.bumps[i].size.x *= scale;
-        }
-        this.render();
-        this.dispatchEvent(new Event('change'));
-    });
-}
-
-selectBump(index) {
-    const handles = this.shadow.querySelectorAll('.bump');
-    for (const handle of handles) {
-        const handleIndex = parseInt(handle.dataset.index);
-        if (handleIndex === index) {
-            handle.classList.add('selected');
-        } else {
-            handle.classList.remove('selected');
-        }
-    }
-
-    const color = this.bumps[index].color;
-    this.binds.color.value = CommonUtils.rgb2hex([color.r, color.g, color.b]);
-    this.binds.alpha.value = color.a;
-}
-
-getSelectedBumpIndex() {
-    const selectedBump = this.shadow.querySelector('.bump.selected');
-    if (selectedBump) {
-        return parseInt(selectedBump.dataset.index);
-    } else {
-        return -1;
-    }
-}
-
-changeListener() {
-    const selectedBump = this.shadow.querySelector('.bump.selected');
-    const index = parseInt(selectedBump.dataset.index);
-    const color = CommonUtils.hex2rgb(this.binds.color.value);
-    const alpha = parseFloat(this.binds.alpha.value);
-    this.bumps[index].color.r = color[0];
-    this.bumps[index].color.g = color[1];
-    this.bumps[index].color.b = color[2];
-    this.bumps[index].color.a = alpha;
-    this.render();
-    this.dispatchEvent(new Event('change'));
 }
 
 }
