@@ -59,7 +59,7 @@ constructor(gl, volume, environmentTexture, options) {
         const { name, value } = e.detail;
 
         if (name === 'transferFunction') {
-            this.setTransferFunction(this.transferFunction);
+            this.setTransferFunction(value);
         } else if (name === 'lightSpectrum') {
             this.setLightSpectrum(value);
         }
@@ -87,6 +87,13 @@ constructor(gl, volume, environmentTexture, options) {
         min: gl.NEAREST,
         max: gl.NEAREST,
     });
+}
+
+setTransferFunction(transferFunction) {
+    const gl = this._gl;
+    gl.bindTexture(gl.TEXTURE_2D, this._transferFunction);
+    console.log(transferFunction);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 256, 0, gl.RGBA, gl.UNSIGNED_BYTE, transferFunction);
 }
 
 setLightSpectrum(data) {

@@ -172,7 +172,7 @@ float mean3(vec3 v) {
 
 void main() {
 
-    float spectrum[numberOfSamples];
+    /*float spectrum[numberOfSamples];
     for (uint i = 0u; i < numberOfSamples; i++) {
         float position = float(i) / float(numberOfSamples);
         vec2 texturePosition = vec2(position, 0.5);
@@ -197,7 +197,27 @@ void main() {
     oDirection = vec4(direction, float(bounces));
     oTransmittance = vec4(transmittance, 0);
     vec3 color = spectrumToXYZ(spectrum);
-    oRadiance = vec4(color, 1.0);
+    oRadiance = vec4(color, 1.0);*/
+
+    vec2 mappedPosition = vPosition * 0.5 + 0.5;
+    
+    vec3 position = texture(uPosition, mappedPosition).xyz;
+
+    vec4 directionAndBounces = texture(uDirection, mappedPosition);
+    vec3 direction = directionAndBounces.xyz;
+    uint bounces = uint(directionAndBounces.w + 0.5);
+
+    vec3 transmittance = texture(uTransmittance, mappedPosition).rgb;
+    vec4 radianceAndSamples = texture(uRadiance, mappedPosition);
+    vec3 radiance = radianceAndSamples.rgb;
+    uint samples = uint(radianceAndSamples.w + 0.5);
+
+    oPosition = vec4(position, 0);
+    oDirection = vec4(direction, float(bounces));
+    oTransmittance = vec4(transmittance, 0);
+    vec4 color = texture(uTransferFunction, mappedPosition);
+    oRadiance = color;
+
     
 }
 
