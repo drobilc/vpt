@@ -179,6 +179,7 @@ mouseDownListener(event) {
         // it.
         this.isMovingExistingSelection = true;
         this.currentSelection = clickedSelection;
+        this.binds.spectrum.setSpectrum(this.currentSelection.spectrum);
         
         // Reuse [this.selectionStart] variable to hold the mouse offset inside
         // the selection.
@@ -204,6 +205,7 @@ mouseUpListener(event) {
             let selection = new Selection(this.selectionStart, this.selectionEnd);
             this.selections.push(selection);
             this.currentSelection = selection;
+            this.binds.spectrum.setSpectrum(this.currentSelection.spectrum);
             this.isMakingNewSelection = false;
             this.selectionStart = null;
             this.selectionEnd = null;
@@ -282,7 +284,7 @@ resizeTransferFunction(width, height) {
 
 updateUI() {
     let displaySpectrum = this.currentSelection !== null;
-    this.binds.spectrum.style.display = displaySpectrum ? 'block' : 'none';
+    this.binds.spectrum.style.visibility = displaySpectrum ? 'visible' : 'hidden';
 }
 
 renderOverlay() {

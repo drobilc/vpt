@@ -40,6 +40,11 @@ get value() {
     return this.spectrum;
 }
 
+setSpectrum(spectrum) {
+    this.spectrum = Float32Array.from(spectrum);
+    this._updateUI();
+}
+
 _updateUI() {
     const ctx = this.context;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
