@@ -1,14 +1,12 @@
 import { DOMUtils } from '../../utils/DOMUtils.js';
-import { CommonUtils } from '../../utils/CommonUtils.js';
 import { WebGL } from '../../WebGL.js';
-import { Draggable } from '../../Draggable.js';
 
 const [ SHADERS, MIXINS ] = await Promise.all([
     'shaders.json',
     'mixins.json',
 ].map(url => fetch(url).then(response => response.json())));
 
-const [ templateElement, templateBump ] = await Promise.all([
+const [ templateElement ] = await Promise.all([
     new URL('./SpectralTransferFunction.html', import.meta.url),
 ].map(url => fetch(url).then(response => response.text())));
 
@@ -20,6 +18,7 @@ class Selection {
     constructor(start, end) {
         this.start = start;
         this.end = end;
+        this.spectrum = new Float32Array(32);
     }
 
     setSpectrum(spectrum) {
@@ -95,12 +94,7 @@ constructor() {
     this.overlayCanvas.addEventListener('mousedown', this.mouseDownListener.bind(this));
     this.overlayCanvas.addEventListener('mouseup', this.mouseUpListener.bind(this));
     this.overlayCanvas.addEventListener('mousemove', this.mouseMoveListener.bind(this));
-
-    // this.binds.spectrum.addEventListener('change', this.changeListener);
-    this.binds.spectrum.addEventListener('change', function(e) {
-        // TODO: Update transfer function when spectrum changes.
-        // console.log('Spectrum changed!');
-    });
+    this.binds.spectrum.addEventListener('change', this.spectrumChangeListener.bind(this));
 
     this.binds.cancelButton.addEventListener('click', function() {
         this.resetSelection();
@@ -206,13 +200,19 @@ mouseUpListener(event) {
     // add a new selection to a list of selections and set it as currently
     // selected, so that the spectrum can be changed.
     if (this.isMakingNewSelection) {
-        if ((this.selectionEnd - this.selectionStart) <= 0.1) return;
-        let selection = new Selection(this.selectionStart, this.selectionEnd);
-        this.selections.push(selection);
-        this.currentSelection = selection;
-        this.isMakingNewSelection = false;
-        this.selectionStart = null;
-        this.selectionEnd = null;
+        if ((this.selectionEnd - this.selectionStart) > 0.1) {
+            let selection = new Selection(this.selectionStart, this.selectionEnd);
+            this.selections.push(selection);
+            this.currentSelection = selection;
+            this.isMakingNewSelection = false;
+            this.selectionStart = null;
+            this.selectionEnd = null;
+        } else {
+            this.isMakingNewSelection = false;
+            this.selectionStart = null;
+            this.selectionEnd = null;
+            this.currentSelection = null;
+        }
     } else if (this.isMovingExistingSelection) {
         this.isMovingExistingSelection = false;
         this.selectionStart = null;
@@ -248,6 +248,16 @@ mouseMoveListener(event) {
     this.render();
 }
 
+spectrumChangeListener(event) {
+    if (!this.currentSelection) return;
+
+    // The change event on spectrum UI object also contains Float32Array of
+    // values. Store this into current selection.
+    let spectrum = event.detail;
+    this.currentSelection.setSpectrum(Float32Array.from(spectrum));
+    this.render();
+}
+
 destroy() {
     const gl = this._gl;
     gl.deleteBuffer(this._clipQuad);
@@ -270,6 +280,11 @@ resizeTransferFunction(width, height) {
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
 }
 
+updateUI() {
+    let displaySpectrum = this.currentSelection !== null;
+    this.binds.spectrum.style.display = displaySpectrum ? 'block' : 'none';
+}
+
 renderOverlay() {
     const ctx = this.overlayContext;
     ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
@@ -281,6 +296,18 @@ renderOverlay() {
         if (selection === this.currentSelection) continue;
         ctx.fillStyle = "rgba(150, 150, 150, 0.75)";
         ctx.fillRect(selection.start, 0, selection.width(), this.overlayCanvas.height);
+
+        if (selection.spectrum != null) {
+            let width = selection.width();
+            let sectionHeight = this.overlayCanvas.height / selection.spectrum.length;
+            ctx.fillStyle = "white";
+
+            for (let i = 0; i < selection.spectrum.length; i++) {
+                let value = selection.spectrum[i];
+                let positionY = i * sectionHeight;
+                ctx.fillRect(selection.start, positionY, value * width, sectionHeight);
+            }
+        }
     }
 
     if (this.selectionStart != null && this.selectionEnd != null) {
@@ -292,6 +319,18 @@ renderOverlay() {
     if (this.currentSelection != null) {
         ctx.fillStyle = "rgba(33, 150, 243, 0.5)";
         ctx.fillRect(this.currentSelection.start, 0, this.currentSelection.width(), this.overlayCanvas.height);
+        // Draw spectrum inside the current selection
+        if (this.currentSelection.spectrum != null) {
+            let width = this.currentSelection.width();
+            let sectionHeight = this.overlayCanvas.height / this.currentSelection.spectrum.length;
+            ctx.fillStyle = "white";
+
+            for (let i = 0; i < this.currentSelection.spectrum.length; i++) {
+                let value = this.currentSelection.spectrum[i];
+                let positionY = i * sectionHeight;
+                ctx.fillRect(this.currentSelection.start, positionY, value * width, sectionHeight);
+            }
+        }
     }
 }
 
@@ -307,6 +346,7 @@ render() {
         gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
     }*/
     this.renderOverlay();
+    this.updateUI();
 }
 
 get value() {
