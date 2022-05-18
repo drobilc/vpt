@@ -1,10 +1,4 @@
 import { DOMUtils } from '../../utils/DOMUtils.js';
-import { WebGL } from '../../WebGL.js';
-
-const [ SHADERS, MIXINS ] = await Promise.all([
-    'shaders.json',
-    'mixins.json',
-].map(url => fetch(url).then(response => response.json())));
 
 const [ templateElement ] = await Promise.all([
     new URL('./SpectralTransferFunction.html', import.meta.url),
@@ -67,27 +61,6 @@ constructor() {
     
     this.resize(this.width, this.height);
 
-    this._gl = this.canvas.getContext('webgl2', {
-        depth                 : false,
-        stencil               : false,
-        antialias             : false,
-        preserveDrawingBuffer : true
-    });
-    const gl = this._gl;
-
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-
-    this._clipQuad = WebGL.createClipQuad(gl);
-    this._program = WebGL.buildPrograms(gl, {
-        TransferFunction: SHADERS.TransferFunction
-    }, MIXINS).TransferFunction;
-    const program = this._program;
-    gl.useProgram(program.program);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this._clipQuad);
-    gl.enableVertexAttribArray(program.attributes.aPosition);
-    gl.vertexAttribPointer(program.attributes.aPosition, 2, gl.FLOAT, false, 0, 0);
-
     // A list of currently active selections.
     this.selections = [];
 
@@ -96,15 +69,11 @@ constructor() {
     this.overlayCanvas.addEventListener('mousemove', this.mouseMoveListener.bind(this));
     this.binds.spectrum.addEventListener('change', this.spectrumChangeListener.bind(this));
 
-    this.binds.cancelButton.addEventListener('click', function() {
-        this.resetSelection();
-        this.render();
-    }.bind(this));
-
     this.binds.clearButton.addEventListener('click', function() {
         this.resetSelection();
         this.selections = [];
         this.render();
+        this.emitChangeEvent();
     }.bind(this));
 
     // Whether the user has clicked on the overlay canvas in some empty space.
@@ -121,6 +90,10 @@ constructor() {
     this.selectionEnd = null;
 
     this.currentSelection = null;
+}
+
+emitChangeEvent() {
+    this.dispatchEvent(new Event('change'));
 }
 
 resetSelection() {
@@ -215,9 +188,11 @@ mouseUpListener(event) {
             this.selectionEnd = null;
             this.currentSelection = null;
         }
+        this.emitChangeEvent();
     } else if (this.isMovingExistingSelection) {
         this.isMovingExistingSelection = false;
         this.selectionStart = null;
+        this.emitChangeEvent();
     }
 
     this.render();
@@ -245,6 +220,7 @@ mouseMoveListener(event) {
             this.currentSelection.start = newStart;
             this.currentSelection.end = newStart + width;
         }
+        this.emitChangeEvent();
     }
 
     this.render();
@@ -257,13 +233,8 @@ spectrumChangeListener(event) {
     // values. Store this into current selection.
     let spectrum = event.detail;
     this.currentSelection.setSpectrum(Float32Array.from(spectrum));
+    this.emitChangeEvent();
     this.render();
-}
-
-destroy() {
-    const gl = this._gl;
-    gl.deleteBuffer(this._clipQuad);
-    gl.deleteProgram(this._program.program);
 }
 
 resize(width, height) {
@@ -278,8 +249,6 @@ resizeTransferFunction(width, height) {
     this.canvas.height = height;
     this.transferFunctionWidth = width;
     this.transferFunctionHeight = height;
-    const gl = this._gl;
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
 }
 
 updateUI() {
@@ -337,22 +306,31 @@ renderOverlay() {
 }
 
 render() {
-    const gl = this._gl;
-    const { uniforms } = this._program;
-
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    /*for (const bump of this.bumps) {
-        gl.uniform2f(uniforms.uPosition, bump.position.x, bump.position.y);
-        gl.uniform2f(uniforms.uSize, bump.size.x, bump.size.y);
-        gl.uniform4f(uniforms.uColor, bump.color.r, bump.color.g, bump.color.b, bump.color.a);
-        gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
-    }*/
     this.renderOverlay();
     this.updateUI();
 }
 
 get value() {
-    return this.canvas;
+    let textureData = new Uint8Array(this.width * this.height * 4);
+    for (let i = 0; i < this.selections.length; i++) {
+        let selection = this.selections[i];
+        let startIndex = Math.floor((selection.start / this.overlayCanvas.width) * this.width);
+        let endIndex = Math.floor((selection.end / this.overlayCanvas.width) * this.width);
+        for (let x = startIndex; x < endIndex; x++) {
+            for (let y = 0; y < this.height; y++) {
+                let index = (y * this.width + x) * 4;
+                let spectrumIndex = Math.floor((y / this.height) * selection.spectrum.length);
+                let value = selection.spectrum[spectrumIndex];
+                let scaledValue = Math.floor(value * 255);
+                textureData[index] = scaledValue;
+                textureData[index + 1] = scaledValue;
+                textureData[index + 2] = scaledValue;
+                textureData[index + 3] = 255;
+            }
+        }
+    }
+
+    return textureData;
 }
 
 }
