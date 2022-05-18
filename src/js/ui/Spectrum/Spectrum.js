@@ -87,7 +87,7 @@ _setValueByEvent(e) {
     let value = 1 - (y / rect.height);
     this.spectrum[bandIndex] = value;
     this._updateUI();
-    this.dispatchEvent(new Event('change'));
+    this.dispatchEvent(new CustomEvent('change', { detail: this.spectrum }));
 }
 
 pointerdownListener(e) {
@@ -113,7 +113,7 @@ resetButtonClickListener(e) {
         this.spectrum[i] = 0;
     }
     this._updateUI();
-    this.dispatchEvent(new Event('change'));
+    this.dispatchEvent(new CustomEvent('change', { detail: this.spectrum }));
 }
 
 }
