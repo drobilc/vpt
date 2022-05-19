@@ -92,7 +92,6 @@ constructor(gl, volume, environmentTexture, options) {
 setTransferFunction(transferFunction) {
     const gl = this._gl;
     gl.bindTexture(gl.TEXTURE_2D, this._transferFunction);
-    console.log(transferFunction);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 256, 0, gl.RGBA, gl.UNSIGNED_BYTE, transferFunction);
 }
 
