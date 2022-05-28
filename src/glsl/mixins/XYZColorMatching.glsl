@@ -12,6 +12,20 @@ float S(float x, float y, float z) {
     return x < 0.0 ? y : z;
 }
 
+float X31(float lambda) {
+    float e1 = 1.065 * exp(-0.5 * pow((lambda - 595.8) / 33.33, 2.0));
+    float e2 = 0.366 * exp(-0.5 * pow((lambda - 446.8) / 19.44, 2.0));
+    return e1 + e2;
+}
+
+float Y31(float lambda) {
+    return 1.014 * exp(-0.5 * pow((log(lambda) - log(556.3)) / 0.075, 2.0));
+}
+
+float Z31(float lambda) {
+    return 1.839 * exp(-0.5 * pow((log(lambda) - log(449.8)) / 0.051, 2.0));
+}
+
 float X(float x) {
     float dx1 = x - 442.0;
     float v1 = dx1 * S(dx1, 0.0624, 0.0374);
@@ -39,21 +53,11 @@ float Z(float x) {
 }
 
 vec3 xyzResponseAt(float x) {
-    return vec3(X(x), Y(x), Z(x));
+    return vec3(X31(x), Y31(x), Z31(x));
 }
 
 vec3 averageXYZResponseInBin(float fromLambda, float toLambda, uint subsamples) {
-    vec3 result = vec3(0, 0, 0);
-
-    float interval = toLambda - fromLambda;
-    float sectionWidth = interval / float(subsamples);
-
-    for (uint i = 0u; i < subsamples; i++) {
-        float lambda = fromLambda + float(i) * sectionWidth;
-        result += xyzResponseAt(lambda);
-    }
-
-    return result / float(subsamples);
+    return xyzResponseAt(fromLambda + ((toLambda - fromLambda) * 0.5));
 }
 
 float sum3(vec3 v) {
@@ -71,7 +75,7 @@ vec3 spectrumToXYZ(float spectrum[numberOfSamples]) {
     for (uint i = 0u; i < numberOfSamples; i++) {
         float wavelength = startWavelength + float(i) * bucketSize;
         float nextWavelength = startWavelength + float(i + 1u) * bucketSize;
-        XYZ[i] = averageXYZResponseInBin(wavelength, nextWavelength, 8u);
+        XYZ[i] = 683.0 * averageXYZResponseInBin(wavelength, nextWavelength, 8u);
     }
 
     // Compute the integral / riemann sum of the spectrum multiplied with each
@@ -86,6 +90,7 @@ vec3 spectrumToXYZ(float spectrum[numberOfSamples]) {
     vec3 color = scale * xyzColor;
     
     // Compute the xyz coefficients from XYZ values.
-    return color / sum3(color);
+    // return color / sum3(color);
+    return color;
 
 }
