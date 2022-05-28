@@ -58,7 +58,7 @@ constructor(gl, volume, environmentTexture, options) {
     this.lightSpectrumTexture = WebGL.createTexture(gl, {
         width  : 1,
         height : 1,
-        data: new Uint8Array([255, 0, 0, 255]),
+        data: new Uint8Array([0, 0, 0, 255]),
         type: gl.UNSIGNED_BYTE,
         wrapS: gl.CLAMP_TO_EDGE,
         wrapT: gl.CLAMP_TO_EDGE,
@@ -127,7 +127,7 @@ _generateFrame() {
     gl.uniform1i(uniforms.uVolume, 0);
     gl.uniform1i(uniforms.uEnvironment, 1);
     gl.uniform1i(uniforms.uTransferFunction, 2);
-    gl.uniform1i(uniforms.lightSpectrum, 3);
+    gl.uniform1i(uniforms.uLightSpectrum, 3);
 
     const mvpit = this.calculateMVPInverseTranspose();
     gl.uniformMatrix4fv(uniforms.uMvpInverseMatrix, false, mvpit.m);
