@@ -43,6 +43,12 @@ out vec4 oColor;
 // #link /glsl/mixins/intersectCube
 @intersectCube
 
+// #link /glsl/mixins/XYZColorMatching
+@XYZColorMatching
+
+// #link /glsl/mixins/XYZITU2002
+@XYZITU2002
+
 vec2 rand(vec2 p) {
     const mat2 M = mat2(
         23.14069263277926, 2.665144142690225,
@@ -60,13 +66,13 @@ vec4 sampleEnvironmentMap(vec3 d) {
     return texture(uEnvironment, texCoord);
 }
 
-vec4 sampleVolumeColor(vec3 position) {
-    vec2 volumeSample = texture(uVolume, position).rg;
-    vec4 transferSample = texture(uTransferFunction, volumeSample);
-    return transferSample;
+float sampleVolumeWavelengthAbsorption(vec3 position, float lambda) {
+    float volumeSample = texture(uVolume, position).r;
+    vec4 transferSample = texture(uTransferFunction, vec2(volumeSample, lambda));
+    return transferSample.r;
 }
 
-float sampleDistance(vec3 from, vec3 to, inout vec2 seed) {
+float sampleDistance(vec3 from, vec3 to, float lambda, inout vec2 seed) {
     float maxDistance = distance(from, to);
     float dist = 0.0;
     float invSigmaMax = 1.0 / uSigmaMax;
@@ -79,8 +85,8 @@ float sampleDistance(vec3 from, vec3 to, inout vec2 seed) {
             break;
         }
         vec3 samplingPosition = mix(from, to, dist * invMaxDistance);
-        vec4 transferSample = sampleVolumeColor(samplingPosition);
-        float alphaSample = transferSample.a * uAlphaCorrection;
+        float alpha = sampleVolumeWavelengthAbsorption(samplingPosition, lambda);
+        float alphaSample = alpha * uAlphaCorrection;
         if (seed.y < alphaSample * invSigmaMax) {
             break;
         }
@@ -89,7 +95,7 @@ float sampleDistance(vec3 from, vec3 to, inout vec2 seed) {
     return dist;
 }
 
-float sampleTransmittance(vec3 from, vec3 to, inout vec2 seed) {
+float sampleTransmittance(vec3 from, vec3 to, float lambda, inout vec2 seed) {
     float maxDistance = distance(from, to);
     float dist = 0.0;
     float invSigmaMax = 1.0 / uSigmaMax;
@@ -103,12 +109,16 @@ float sampleTransmittance(vec3 from, vec3 to, inout vec2 seed) {
             break;
         }
         vec3 samplingPosition = mix(from, to, dist * invMaxDistance);
-        vec4 transferSample = sampleVolumeColor(samplingPosition);
-        float alphaSample = transferSample.a * uAlphaCorrection;
+        float alpha = sampleVolumeWavelengthAbsorption(samplingPosition, lambda);
+        float alphaSample = alpha * uAlphaCorrection;
         transmittance *= 1.0 - alphaSample * invSigmaMax;
     } while (true);
 
     return transmittance;
+}
+
+float sampleLight(float lambda) {
+    return texture(uLightSpectrum, vec2(lambda, 0.5)).r;
 }
 
 void main() {
@@ -119,26 +129,56 @@ void main() {
     if (tbounds.x >= tbounds.y) {
         oColor = sampleEnvironmentMap(rayDirectionUnit);
     } else {
+
+        vec3 color = vec3(0, 0, 0);
+
         vec3 from = mix(vRayFrom, vRayTo, tbounds.x);
         vec3 to = mix(vRayFrom, vRayTo, tbounds.y);
-        float maxDistance = distance(from, to);
 
-        vec2 seed = vPosition + rand(vec2(uOffset, uOffset));
-        float dist = sampleDistance(from, to, seed);
+        bool atLeastOneHit = false;
 
-        if (dist > maxDistance) {
-            oColor = sampleEnvironmentMap(rayDirectionUnit);
-        } else {
-            from = mix(from, to, dist / maxDistance);
-            tbounds = max(intersectCube(from, uScatteringDirection), 0.0);
-            to = from + uScatteringDirection * tbounds.y;
-            vec4 diffuseColor = sampleVolumeColor(from);
-            vec4 lightColor = sampleEnvironmentMap(uScatteringDirection);
-            float transmittance = sampleTransmittance(from, to, seed);
+        for (uint i = 0u; i < numberOfSamples; i++) {
+            // Normalized lambda value in interval [0, 1], where 0 represents
+            // the startWavelength and the 1 represents the endWavelength.
+            float unitLambda = float(i) / float(numberOfSamples);
 
-            oColor = diffuseColor * lightColor * transmittance;
+            // To convert to value in nanometers, use
+            float lambda = mix(startWavelength, endWavelength, unitLambda);
+
+            // If the light doesn't emit light at current lambda, skip tracing.
+            float lightIntensity = sampleLight(unitLambda);
+            if (lightIntensity <= 0.0001) continue;
+
+            float maxDistance = distance(from, to);
+            vec2 seed = vPosition + rand(vec2(uOffset, uOffset));
+
+            float dist = sampleDistance(from, to, unitLambda, seed);
+
+            if (dist > maxDistance) {
+                
+            } else {
+                atLeastOneHit = true;
+
+                from = mix(from, to, dist / maxDistance);
+                tbounds = max(intersectCube(from, uScatteringDirection), 0.0);
+                to = from + uScatteringDirection * tbounds.y;
+
+                float transmittance = sampleTransmittance(from, to, unitLambda, seed);
+                float response = transmittance * lightIntensity;
+                color += response * xyzResponseAt(lambda);
+
+            }
+
         }
+
+        if (atLeastOneHit) {
+            oColor = vec4(xyz2rgb(color), 1);
+        } else {
+            oColor = sampleEnvironmentMap(rayDirectionUnit);
+        }
+
     }
+    
 }
 
 // #part /glsl/shaders/renderers/SpectralRenderer/integrate/vertex
